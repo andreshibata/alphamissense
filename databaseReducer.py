@@ -6,41 +6,28 @@ def reduce_clinvar_xml_size(file_name, reduction_factor=10):
     # Construct the full file path
     file_path = os.path.join(os.getcwd(), file_name)
 
-    # Count the total elements to determine how many to remove
-    total_elements = 0
-    print('Initial Parsing...\n')
-    for event, elem in ET.iterparse(file_path, events=('end',)):
-        if elem.tag.endswith('ClinVarSet'):
-            total_elements += 1
-            elem.clear()  # Clear the element to save memory
-    elements_to_keep = total_elements // reduction_factor
-    elements_to_remove = total_elements - elements_to_keep
+    # Parse the XML file and get the root
+    tree = ET.parse(file_path)
+    root = tree.getroot()
 
-    # Re-parse the file and remove elements
-    print("Starting reduction:\n")
-    tree = ET.ElementTree()
-    root = None
-    with tqdm(total=elements_to_remove, desc="Overall Progress") as pbar:
-        for event, elem in ET.iterparse(file_path, events=('start', 'end')):
-            if event == 'start' and root is None:
-                root = elem  # Capture the root element
-                tree._setroot(root)
-            if event == 'end' and elem.tag.endswith('ClinVarSet'):
-                if elements_to_remove > 0:
-                    root.remove(elem)  # Remove the element
-                    elements_to_remove -= 1
-                    pbar.update(1)  # Update progress bar after each element removal
-                elem.clear()  # Clear the element to save memory
+    # Calculate the number of ClinVarSets to retain
+    total_clinvar_sets = len(root.findall('.//ClinVarSet'))
+    number_to_retain = total_clinvar_sets // reduction_factor
 
-    # Save the modified XML
-    reduced_file_path = file_path.replace('.xml', '_reduced.xml')
-    tree.write(reduced_file_path)
-    print("Reduction Completed")
+    # Create a list of ClinVarSet elements to be removed
+    clinvar_sets_to_remove = []
 
-    return reduced_file_path
+    # Select ClinVarSets to be removed
+    for i, clinvar_set in enumerate(root.findall('.//ClinVarSet')):
+        if i % reduction_factor != 0:
+            clinvar_sets_to_remove.append(clinvar_set)
 
-# Usage
-print("Starting Program\n")
-file_name = 'ClinVarFullRelease_00-latest.xml'  # Replace with your actual file name
-reduced_file_path = reduce_clinvar_xml_size(file_name)
-print(f'Reduced file saved at: {reduced_file_path}')
+    # Remove the selected ClinVarSets with a progress bar
+    for clinvar_set in tqdm(clinvar_sets_to_remove, desc='Reducing file size'):
+        root.remove(clinvar_set)
+
+    # Write the reduced XML back to a new file
+    reduced_file_name = f'reduced_{file_name}'
+    tree.write(os.path.join(os.getcwd(), reduced_file_name))
+
+    print(f'Reduced file written to {reduced_file_name}')
