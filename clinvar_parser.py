@@ -1,34 +1,45 @@
 import xml.etree.ElementTree as ET
 import pandas as pd
+from tqdm import tqdm
 
 def parse_clinvar_xml(clinvar_xml_path):
-    # Parse the XML file
-    tree = ET.parse(clinvar_xml_path)
-    root = tree.getroot()
-
-    # Define namespaces to simplify finding elements
-    ns = {'clinvar': 'http://www.ncbi.nlm.nih.gov/clinvar/xml'}
-
-    # Extract relevant data from the XML
+    # Create an empty list to store the variant data
     variant_data = []
-    for variant in root.findall('.//clinvar:ReferenceClinVarAssertion', ns):
-        # Extract the attributes of interest, for example:
-        rcv_accession = variant.find('.//clinvar:RCVAccession', ns).attrib.get('Acc')
-        clinical_significance = variant.find('.//clinvar:ClinicalSignificance', ns).find('.//clinvar:Description', ns).text
-        # ... more attributes as needed
-
-        # Add to the list
-        variant_data.append({
-            #'GeneID': gene_id,
-            'RCVAccession': rcv_accession,
-            'ClinicalSignificance': clinical_significance,
-            #'ClinSigSimple': clinsig_simple,
-            #'HGNC_ID': hgnc_id,
+    
+    # Use iterparse to parse the file incrementally
+    print("Loading Data File...\n")
+    
+    # Use iterparse to parse the file incrementally
+    context = ET.iterparse(clinvar_xml_path, events=('end',))
+    # Fast iteration using iterparse
+    for event, elem in tqdm(context, desc="Parsing Variants"):
+        if elem.tag.endswith('ReferenceClinVarAssertion'):
+            # Extract the attributes of interest, for example:
+            rcv_accession = elem.find('.//ClinVarAccession')
+            clinical_significance = elem.find('.//ClinicalSignificance')
             # ... more attributes as needed
-        })
+                
+            if clinical_significance.find('.//Description') is not None:
+                clinical_significance = clinical_significance.find('.//Description').text
+            if rcv_accession.attrib.get('Type') != 'RCV':
+                print("Error, not RCV record")
+            else:
+                rcv_accession = rcv_accession.attrib.get('Acc')
+
+            # Add to the list
+            variant_data.append({
+                'RCVAccession': rcv_accession,
+                'ClinicalSignificance': clinical_significance,
+                # ... more attributes as needed
+                #elem
+            })
+
+            # It's important to clear elements to free up memory
+            elem.clear()
 
     # Convert to a DataFrame
     variant_df = pd.DataFrame(variant_data)
+    print("Data File Loaded!\n")
     return variant_df
 
 def preprocess_variant_data(variant_df):
