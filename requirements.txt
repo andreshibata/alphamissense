@@ -13,3 +13,4 @@ tdqm
 pandas
 optax
 flax
+sklearn

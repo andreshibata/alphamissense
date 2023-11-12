@@ -2,7 +2,7 @@ import xml.etree.ElementTree as ET
 import pandas as pd
 from tqdm import tqdm
 
-def parse_clinvar_xml(clinvar_xml_path):
+def parse_clinvar_xml(clinvar_xml_path, reduced_size):
     # Create an empty list to store the variant data
     variant_data = []
     
@@ -12,6 +12,7 @@ def parse_clinvar_xml(clinvar_xml_path):
     # Use iterparse to parse the file incrementally
     context = ET.iterparse(clinvar_xml_path, events=('end',))
     # Fast iteration using iterparse
+    i = 0
     for event, elem in tqdm(context, desc="Parsing Variants"):
         if elem.tag.endswith('ReferenceClinVarAssertion'):
             # Extract the attributes of interest, for example:
@@ -36,6 +37,11 @@ def parse_clinvar_xml(clinvar_xml_path):
 
             # It's important to clear elements to free up memory
             elem.clear()
+            
+            i = i + 1
+            #Limits the number of data points taken from database
+            if i > reduced_size:
+                break;
 
     # Convert to a DataFrame
     variant_df = pd.DataFrame(variant_data)
